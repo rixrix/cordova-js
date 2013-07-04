@@ -17,36 +17,84 @@
  * under the License.
  */
 
+var childProcess = require('child_process');
 var fs    = require('fs')
 var util  = require('util')
 var path  = require('path')
 
 var packager = module.exports
 
-//------------------------------------------------------------------------------
-packager.generate = function(platform, commitId, useWindowsLineEndings) {
-    var outFile;
-    var time = new Date().valueOf();
-
-    var libraryRelease = packager.bundle(platform, false, commitId);
-    // if we are using windows line endings, we will also add the BOM
-    if(useWindowsLineEndings) {
-        libraryRelease = "\ufeff" + libraryRelease.split(/\r?\n/).join("\r\n");
+var cachedGitVersion = null;
+packager.computeCommitId = function(callback) {
+    if (cachedGitVersion) {
+        callback(cachedGitVersion);
+        return;
     }
-    var libraryDebug   = packager.bundle(platform, true, commitId);
-    
-    time = new Date().valueOf() - time;
-    outFile = path.join('pkg', 'cordova.' + platform + '.js');
-    fs.writeFileSync(outFile, libraryRelease, 'utf8');
-    
-    outFile = path.join('pkg', 'debug', 'cordova.' + platform + '-debug.js');
-    fs.writeFileSync(outFile, libraryDebug, 'utf8');
-    
-    console.log('generated platform: ' + platform + ' in ' + time + 'ms');
+    var gitPath = 'git';
+    var args = 'describe --tags --long';
+    childProcess.exec(gitPath + ' ' + args, function(err, stdout, stderr) {
+        var isWindows = process.platform.slice(0, 3) == 'win';
+        if (err && isWindows) {
+            gitPath = '"' + path.join(process.env['ProgramFiles'], 'Git', 'bin', 'git.exe') + '"';
+            childProcess.exec(gitPath + ' ' + args, function(err, stdout, stderr) {
+                if (err) {
+                    error(err);
+                } else {
+                    done(stdout);
+                }
+            });
+        } else if (err) {
+            error(err);
+        } else {
+            done(stdout);
+        }
+    });
+
+    function error(err) {
+        throw new Error(err);
+    }
+
+    function done(stdout) {
+        var version = stdout.trim().replace(/^2.5.0-.*?-/, 'dev-');
+        cachedGitVersion = version;
+        callback(version);
+    };
 }
 
 //------------------------------------------------------------------------------
-packager.bundle = function(platform, debug, commitId ) {
+packager.generate = function(platform, useWindowsLineEndings, callback) {
+    packager.computeCommitId(function(commitId) {
+        var outFile;
+        var time = new Date().valueOf();
+
+        var libraryRelease = packager.bundle(platform, false, commitId);
+        // if we are using windows line endings, we will also add the BOM
+        if(useWindowsLineEndings) {
+            libraryRelease = "\ufeff" + libraryRelease.split(/\r?\n/).join("\r\n");
+        }
+        var libraryDebug   = packager.bundle(platform, true, commitId);
+        
+        time = new Date().valueOf() - time;
+        if (!fs.existsSync('pkg')) {
+            fs.mkdirSync('pkg');
+        }
+        if(!fs.existsSync('pkg/debug')) {
+            fs.mkdirSync('pkg/debug');
+        }
+
+        outFile = path.join('pkg', 'cordova.' + platform + '.js');
+        fs.writeFileSync(outFile, libraryRelease, 'utf8');
+        
+        outFile = path.join('pkg', 'debug', 'cordova.' + platform + '-debug.js');
+        fs.writeFileSync(outFile, libraryDebug, 'utf8');
+        
+        console.log('generated cordova.' + platform + '.js @ ' + commitId + ' in ' + time + 'ms');
+        callback();
+    });
+}
+
+//------------------------------------------------------------------------------
+packager.bundle = function(platform, debug, commitId) {
     var modules = collectFiles('lib/common')
     var scripts = collectFiles('lib/scripts')
     
@@ -57,6 +105,7 @@ packager.bundle = function(platform, debug, commitId ) {
 
         //Test platform needs to bring in platform specific plugin's for testing
         copyProps(modules, collectFiles(path.join('lib', 'blackberry', 'plugin'), 'plugin'));
+        copyProps(modules, collectFiles(path.join('lib', 'blackberry10', 'plugin'), 'plugin'));
         copyProps(modules, collectFiles(path.join('lib', 'firefoxos', 'plugin', 'firefoxos'), 'plugin/firefoxos'));
         copyProps(modules, collectFiles(path.join('lib', 'tizen', 'plugin', 'tizen'), 'plugin/tizen'));
         copyProps(modules, collectFiles(path.join('lib', 'windowsphone', 'plugin', 'windowsphone'), 'plugin/windowsphone'));
@@ -74,13 +123,12 @@ packager.bundle = function(platform, debug, commitId ) {
 	
     output.push("// Platform: " + platform);
     output.push("// "  + commitId);
-    output.push("// File generated at :: " + new Date());
 
     // write header
     output.push('/*', getContents('LICENSE-for-js-file.txt'), '*/')
     output.push(';(function() {')
     output.push("var CORDOVA_JS_BUILD_LABEL = '"  + commitId + "';");
-    
+
     // write initial scripts
     if (!scripts['require']) {
         throw new Error("didn't find a script for 'require'")
@@ -222,7 +270,7 @@ function writeContents(oFile, fileName, contents, debug) {
     }
     
     else {
-        contents = '// file: ' + fileName + '\n' + contents    
+        contents = '// file: ' + fileName.split("\\").join("/") + '\n' + contents;
     }
 
     oFile.push(contents)
