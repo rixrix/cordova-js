@@ -26,16 +26,10 @@ module.exports = function(grunt) {
         pkg: grunt.file.readJSON('package.json'),
         cordovajs: {
           "android": {},
-          "bada": {},
-          "blackberry": {},
           "blackberry10": {},
-          "errgen": {},
-          "firefoxos": {},
           "ios": {},
-          "osx":  {},
+          "osx": {},
           "test": {},
-          "tizen": {},
-          "webos":  {},
           "windows8": { useWindowsLineEndings: true },
           "windowsphone": { useWindowsLineEndings: true },
         },
@@ -118,17 +112,17 @@ module.exports = function(grunt) {
         packager.generate(platformName, useWindowsLineEndings, done);
     });
 
-    grunt.registerTask('test', 'Runs test in node', function() {
+    grunt.registerTask('_test', 'Runs test in node', function() {
         var done = this.async();
         require('./test/runner').node(done);
     });
 
-    grunt.registerTask('btest', 'Runs tests in the browser', function() {
+    grunt.registerTask('_btest', 'Runs tests in the browser', function() {
         require('./test/runner').browser();
         this.async(); // never finish.
     });
 
-    grunt.registerTask('complainwhitespace', 'Complain about what fixwhitespace would fix', function() {
+    grunt.registerTask('_complainwhitespace', 'Complain about what fixwhitespace would fix', function() {
         var done = this.async();
         var complainedAboutWhitespace = false;
         processWhiteSpace(function(file, newSource) {
@@ -140,7 +134,7 @@ module.exports = function(grunt) {
         }, done);
     });
 
-    grunt.registerTask('fixwhitespace', 'Converts tabs to four spaces, eliminates trailing white space, converts newlines to proper form - enforcing style guide ftw!', function() {
+    grunt.registerTask('_fixwhitespace', 'Converts tabs to four spaces, eliminates trailing white space, converts newlines to proper form - enforcing style guide ftw!', function() {
         var done = this.async();
         var complainedAboutWhitespace = false;
         processWhiteSpace(function(file, newSource) {
@@ -154,7 +148,7 @@ module.exports = function(grunt) {
     });
 
     // TODO - Delete this task and use Grunt's built-in jshint (CB-3964).
-    grunt.registerTask('hint', 'Runs jshint.', function() {
+    grunt.registerTask('_hint', 'Runs jshint.', function() {
         var done = this.async();
         var knownWarnings = [
             "Redefinition of 'FileReader'",
@@ -182,5 +176,8 @@ module.exports = function(grunt) {
     grunt.loadNpmTasks('grunt-contrib-jshint');
 
     // Default task(s).
-    grunt.registerTask('default', ['cordovajs', 'hint', 'complainwhitespace', 'test']);
+    grunt.registerTask('build', ['cordovajs', '_hint', '_complainwhitespace']);
+    grunt.registerTask('default', ['build', '_test']);
+    grunt.registerTask('test', ['build', '_test']);
+    grunt.registerTask('btest', ['build', '_btest']);
 };

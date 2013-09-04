@@ -99,24 +99,10 @@ packager.bundle = function(platform, debug, commitId) {
     var scripts = collectFiles('lib/scripts')
     
     modules[''] = 'lib/cordova.js'
-    
-    if (platform === 'test') {
-        copyProps(modules, collectFiles(path.join('lib', platform)));
+    copyProps(modules, collectFiles(path.join('lib', platform)));
 
-        //Test platform needs to bring in platform specific plugin's for testing
-        copyProps(modules, collectFiles(path.join('lib', 'blackberry', 'plugin'), 'plugin'));
-        copyProps(modules, collectFiles(path.join('lib', 'blackberry10', 'plugin'), 'plugin'));
-        copyProps(modules, collectFiles(path.join('lib', 'firefoxos', 'plugin', 'firefoxos'), 'plugin/firefoxos'));
-        copyProps(modules, collectFiles(path.join('lib', 'tizen', 'plugin', 'tizen'), 'plugin/tizen'));
-        copyProps(modules, collectFiles(path.join('lib', 'windowsphone', 'plugin', 'windowsphone'), 'plugin/windowsphone'));
-        copyProps(modules, collectFiles(path.join('lib', 'windows8', 'plugin', 'windows8'), 'plugin/windows8'));
-        copyProps(modules, collectFiles(path.join('lib', 'ios', 'plugin', 'ios'), 'plugin/ios/'));
-        copyProps(modules, collectFiles(path.join('lib', 'bada', 'plugin', 'bada'), 'plugin/bada/'));
-        copyProps(modules, collectFiles(path.join('lib', 'android', 'plugin', 'android'), 'plugin/android/'));
-        copyProps(modules, collectFiles(path.join('lib', 'osx', 'plugin', 'osx'), 'plugin/osx/'));
-    }
-    else {
-        copyProps(modules, collectFiles(path.join('lib', platform)))
+    if (platform === 'test') {
+        copyProps(modules, collectFiles(path.join('lib', 'android', 'android'), 'android/'));
     }
 
     var output = [];
@@ -160,16 +146,6 @@ packager.bundle = function(platform, debug, commitId) {
         writeScript(output, scripts[bootstrapPlatform], debug)
     }
 
-    // Include the plugin loading code.
-    if (platform !== 'test') {
-        // NB: This should probably run last of all, and definitely after the bootstrap.
-        if (!scripts['plugin_loader']) {
-            throw new Error("didn't find a script for 'plugin_loader'");
-        }
-
-        writeScript(output, scripts['plugin_loader'], debug);
-    }
-
     // write trailer
     output.push('})();')
 
@@ -197,9 +173,8 @@ function collectFiles(dir, id) {
     if (!id) id = ''
 
     var result = {}    
-    
     var entries = fs.readdirSync(dir)
-    
+
     entries = entries.filter(function(entry) {
         if (entry.match(/\.js$/)) return true
         
@@ -220,7 +195,6 @@ function collectFiles(dir, id) {
             result[moduleId] = fileName
         }
     })
-    
     return copyProps({}, result)
 }
 
